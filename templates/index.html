@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tender Search</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f9f9f9; }
+        input { width: 300px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        button { padding: 10px 15px; margin: 5px; border: none; background: #6c757d; color: white; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #5a6268; }
+        #results { margin-top: 20px; display: flex; justify-content: center; flex-direction: column; align-items: center; }
+        table { border-collapse: collapse; width: 90%; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        tr:nth-child(even) { background-color: #f2f2f2; }
+        .pagination { margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <h1>WIN MORE GOVERNMENT TENDERS</h1>
+    <p>Our AI helps you understand tenders better and make better bids</p>
+
+    <input type="text" id="searchBox" placeholder="Search for tenders...">
+    <button onclick="clearSearch()">Clear</button>
+
+    <div id="results"></div>
+    <div class="pagination">
+        <button onclick="prevPage()">Previous</button>
+        <span id="pageInfo"></span>
+        <button onclick="nextPage()">Next</button>
+    </div>
+
+    <script>
+        let timeout = null;
+        let allData = [];
+        let currentPage = 1;
+        const rowsPerPage = 20;
+
+        document.getElementById("searchBox").addEventListener("input", function() {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => { currentPage = 1; search(); }, 300);
+        });
+
+        function search() {
+            let query = document.getElementById("searchBox").value;
+            fetch(`/search?q=${query}`)
+                .then(response => response.json())
+                .then(data => {
+                    allData = data;
+                    renderTable();
+                });
+        }
+
+        function clearSearch() {
+            document.getElementById("searchBox").value = "";
+            currentPage = 1;
+            search();
+        }
+
+        function renderTable() {
+            let resultsDiv = document.getElementById("results");
+            resultsDiv.innerHTML = "";
+            
+            if (allData.length === 0) {
+                resultsDiv.innerHTML = "<p>No results found</p>";
+                document.getElementById("pageInfo").innerText = "";
+                return;
+            }
+
+            let start = (currentPage - 1) * rowsPerPage;
+            let end = start + rowsPerPage;
+            let paginatedData = allData.slice(start, end);
+
+            let table = "<table><tr>";
+            Object.keys(paginatedData[0]).forEach(key => {
+                table += `<th>${key}</th>`;
+            });
+            table += "</tr>";
+
+            paginatedData.forEach(row => {
+                table += "<tr>";
+                Object.values(row).forEach(val => {
+                    table += `<td>${val}</td>`;
+                });
+                table += "</tr>";
+            });
+
+            table += "</table>";
+            resultsDiv.innerHTML = table;
+
+            // Update pagination info
+            let totalPages = Math.ceil(allData.length / rowsPerPage);
+            document.getElementById("pageInfo").innerText = `Page ${currentPage} of ${totalPages}`;
+        }
+
+        function nextPage() {
+            let totalPages = Math.ceil(allData.length / rowsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderTable();
+            }
+        }
+
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTable();
+            }
+        }
+
+        // Load full list on page load
+        window.onload = search;
+    </script>
+</body>
+</html>
