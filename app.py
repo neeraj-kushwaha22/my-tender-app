@@ -4,27 +4,21 @@ import time
 
 app = Flask(__name__)
 
-# Google Sheets CSV URL
+# Google Sheets CSV link
 CSV_URL = "https://docs.google.com/spreadsheets/d/1IcLsng5J0Iwl9bTTCyIWiLpVdyWpbCOmUxXmuaboBho/gviz/tq?tqx=out:csv"
 
-# Cache variables
-cached_df = None
+# Cache setup
+df_cache = None
 last_fetched = 0
-CACHE_DURATION = 300  # 300 seconds = 5 minutes
+CACHE_TIMEOUT = 300  # 5 minutes
 
 def get_data():
-    global cached_df, last_fetched
-    current_time = time.time()
-
-    # If cache is empty or expired, fetch fresh data
-    if cached_df is None or (current_time - last_fetched) > CACHE_DURATION:
-        cached_df = pd.read_csv(CSV_URL)
-        last_fetched = current_time
-        print("✅ Data refreshed from Google Sheets")
-    else:
-        print("⚡ Using cached data")
-
-    return cached_df
+    global df_cache, last_fetched
+    now = time.time()
+    if df_cache is None or (now - last_fetched) > CACHE_TIMEOUT:
+        df_cache = pd.read_csv(CSV_URL)
+        last_fetched = now
+    return df_cache
 
 @app.route("/")
 def index():
@@ -34,12 +28,16 @@ def index():
 def search():
     query = request.args.get("q", "").lower()
     df = get_data()
-
     if query:
-        results = df[df.apply(lambda row: row.astype(str).str.lower().str.contains(query).any(), axis=1)]
-        return results.to_json(orient="records")
-
-    return jsonify([])
+        # Search all columns for the query
+        results = df[df.apply(
+            lambda row: row.astype(str).str.lower().str.contains(query).any(),
+            axis=1
+        )]
+    else:
+        # No query → return full dataset
+        results = df
+    return results.to_json(orient="records")
 
 if __name__ == "__main__":
     app.run(debug=True)
