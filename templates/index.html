@@ -3,82 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Government Tender Search</title>
+  <title>Tender Search</title>
   <style>
     body {
       font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f9f9f9;
       text-align: center;
-      padding: 20px;
-      background-color: #f8f9fa;
     }
-
     h1 {
-      font-size: 28px;
-      font-weight: bold;
-      margin-bottom: 10px;
+      color: #000;
     }
-
-    p {
-      font-size: 16px;
-      color: #555;
-      margin-bottom: 20px;
-    }
-
-    input[type="text"] {
-      padding: 10px;
+    input {
       width: 300px;
-      border: 2px solid #ccc;
-      border-radius: 6px;
-      font-size: 16px;
+      padding: 10px;
+      margin: 20px 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
     }
-
     button {
-      padding: 10px 16px;
-      margin-left: 5px;
+      padding: 10px 15px;
       border: none;
-      border-radius: 6px;
-      background-color: #6c757d;
+      background-color: #555;
       color: white;
-      font-size: 14px;
+      border-radius: 5px;
       cursor: pointer;
     }
-
-    button:hover {
-      background-color: #5a6268;
+    button:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
     }
-
     table {
-      margin: 20px auto;
+      width: 100%;
       border-collapse: collapse;
-      width: 95%;
+      margin-top: 20px;
       background: white;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
-
-    th, td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: left;
-      font-size: 14px;
-    }
-
     th {
-      background-color: #007bff; /* Blue header */
+      background-color: #007BFF;
       color: white;
-      font-weight: bold;
-      text-transform: capitalize;
+      padding: 10px;
     }
-
-    tr:nth-child(even) {
-      background-color: #f9f9f9; /* Alternating row color */
+    td {
+      border: 1px solid #ddd;
+      padding: 8px;
     }
-
-    .pagination {
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+    #pagination {
       margin-top: 20px;
     }
-
-    .pagination button {
-      margin: 5px;
+    #counter {
+      margin-top: 10px;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -86,104 +64,96 @@
   <h1>WIN MORE GOVERNMENT TENDERS</h1>
   <p>Our AI helps you understand tenders better and make better bids</p>
 
-  <input type="text" id="searchBox" placeholder="Search for tenders...">
+  <input type="text" id="search" placeholder="Search for tenders...">
   <button onclick="clearSearch()">Clear</button>
 
-  <div id="results"></div>
+  <table id="results"></table>
 
-  <div class="pagination">
-    <button onclick="prevPage()">Previous</button>
-    <button onclick="nextPage()">Next</button>
+  <div id="counter"></div>
+
+  <div id="pagination">
+    <button id="prev" onclick="prevPage()">Previous</button>
+    <button id="next" onclick="nextPage()">Next</button>
   </div>
 
   <script>
     let data = [];
     let currentPage = 1;
-    const rowsPerPage = 10;
+    const pageSize = 10;
 
     async function fetchData(query = "") {
       const res = await fetch(`/search?q=${query}`);
       data = await res.json();
       currentPage = 1;
-      displayTable();
+      renderTable();
     }
 
-    function displayTable() {
-      const tableContainer = document.getElementById("results");
-      tableContainer.innerHTML = "";
+    function renderTable() {
+      const table = document.getElementById("results");
+      table.innerHTML = "";
 
       if (data.length === 0) {
-        tableContainer.innerHTML = "<p>No results found</p>";
+        table.innerHTML = "<tr><td>No results found</td></tr>";
+        document.getElementById("counter").innerText = "";
         return;
       }
 
-      const table = document.createElement("table");
-      const thead = document.createElement("thead");
-      const tbody = document.createElement("tbody");
+      // Headers
+      const headers = Object.keys(data[0]);
+      let headerRow = "<tr>";
+      headers.forEach(h => headerRow += `<th>${h}</th>`);
+      headerRow += "</tr>";
+      table.innerHTML = headerRow;
 
-      // Create header row
-      const headerRow = document.createElement("tr");
-      Object.keys(data[0]).forEach(key => {
-        const th = document.createElement("th");
-        th.textContent = key;
-        headerRow.appendChild(th);
-      });
-      thead.appendChild(headerRow);
-
-      // Pagination
-      const start = (currentPage - 1) * rowsPerPage;
-      const end = start + rowsPerPage;
-      const paginatedData = data.slice(start, end);
-
-      // Add rows
-      paginatedData.forEach(row => {
-        const tr = document.createElement("tr");
-        Object.entries(row).forEach(([key, value]) => {
-          const td = document.createElement("td");
-          if (key.toLowerCase().includes("link")) {
-            // Make links clickable
-            const a = document.createElement("a");
-            a.href = value;
-            a.textContent = value;
-            a.target = "_blank";
-            td.appendChild(a);
+      // Rows (pagination)
+      const start = (currentPage - 1) * pageSize;
+      const end = Math.min(start + pageSize, data.length);
+      for (let i = start; i < end; i++) {
+        let row = "<tr>";
+        headers.forEach(h => {
+          if (h.toLowerCase().includes("link")) {
+            row += `<td><a href="${data[i][h]}" target="_blank">Link</a></td>`;
           } else {
-            td.textContent = value;
+            row += `<td>${data[i][h]}</td>`;
           }
-          tr.appendChild(td);
         });
-        tbody.appendChild(tr);
-      });
+        row += "</tr>";
+        table.innerHTML += row;
+      }
 
-      table.appendChild(thead);
-      table.appendChild(tbody);
-      tableContainer.appendChild(table);
-    }
+      // Counter
+      document.getElementById("counter").innerText =
+        `Showing ${start + 1}–${end} of ${data.length} results`;
 
-    function clearSearch() {
-      document.getElementById("searchBox").value = "";
-      fetchData();
+      // Pagination buttons
+      document.getElementById("prev").disabled = currentPage === 1;
+      document.getElementById("next").disabled = end >= data.length;
     }
 
     function prevPage() {
       if (currentPage > 1) {
         currentPage--;
-        displayTable();
+        renderTable();
       }
     }
 
     function nextPage() {
-      if (currentPage * rowsPerPage < data.length) {
+      if ((currentPage * pageSize) < data.length) {
         currentPage++;
-        displayTable();
+        renderTable();
       }
     }
 
-    document.getElementById("searchBox").addEventListener("input", (e) => {
+    function clearSearch() {
+      document.getElementById("search").value = "";
+      fetchData("");
+    }
+
+    document.getElementById("search").addEventListener("input", (e) => {
       fetchData(e.target.value);
     });
 
-    // Load all data on startup
+    // Load initial data
     fetchData();
   </script>
 </body>
