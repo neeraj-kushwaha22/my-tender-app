@@ -1,115 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Tender Search</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f9f9f9; }
-        input { width: 300px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
-        button { padding: 10px 15px; margin: 5px; border: none; background: #6c757d; color: white; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #5a6268; }
-        #results { margin-top: 20px; display: flex; justify-content: center; flex-direction: column; align-items: center; }
-        table { border-collapse: collapse; width: 90%; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
-        .pagination { margin-top: 15px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Government Tender Search</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f8f9fa;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    p {
+      font-size: 16px;
+      color: #555;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"] {
+      padding: 10px;
+      width: 300px;
+      border: 2px solid #ccc;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 10px 16px;
+      margin-left: 5px;
+      border: none;
+      border-radius: 6px;
+      background-color: #6c757d;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #5a6268;
+    }
+
+    table {
+      margin: 20px auto;
+      border-collapse: collapse;
+      width: 95%;
+      background: white;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background-color: #007bff; /* Blue header */
+      color: white;
+      font-weight: bold;
+      text-transform: capitalize;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f9f9f9; /* Alternating row color */
+    }
+
+    .pagination {
+      margin-top: 20px;
+    }
+
+    .pagination button {
+      margin: 5px;
+    }
+  </style>
 </head>
 <body>
-    <h1>WIN MORE GOVERNMENT TENDERS</h1>
-    <p>Our AI helps you understand tenders better and make better bids</p>
+  <h1>WIN MORE GOVERNMENT TENDERS</h1>
+  <p>Our AI helps you understand tenders better and make better bids</p>
 
-    <input type="text" id="searchBox" placeholder="Search for tenders...">
-    <button onclick="clearSearch()">Clear</button>
+  <input type="text" id="searchBox" placeholder="Search for tenders...">
+  <button onclick="clearSearch()">Clear</button>
 
-    <div id="results"></div>
-    <div class="pagination">
-        <button onclick="prevPage()">Previous</button>
-        <span id="pageInfo"></span>
-        <button onclick="nextPage()">Next</button>
-    </div>
+  <div id="results"></div>
 
-    <script>
-        let timeout = null;
-        let allData = [];
-        let currentPage = 1;
-        const rowsPerPage = 20;
+  <div class="pagination">
+    <button onclick="prevPage()">Previous</button>
+    <button onclick="nextPage()">Next</button>
+  </div>
 
-        document.getElementById("searchBox").addEventListener("input", function() {
-            clearTimeout(timeout);
-            timeout = setTimeout(() => { currentPage = 1; search(); }, 300);
+  <script>
+    let data = [];
+    let currentPage = 1;
+    const rowsPerPage = 10;
+
+    async function fetchData(query = "") {
+      const res = await fetch(`/search?q=${query}`);
+      data = await res.json();
+      currentPage = 1;
+      displayTable();
+    }
+
+    function displayTable() {
+      const tableContainer = document.getElementById("results");
+      tableContainer.innerHTML = "";
+
+      if (data.length === 0) {
+        tableContainer.innerHTML = "<p>No results found</p>";
+        return;
+      }
+
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const tbody = document.createElement("tbody");
+
+      // Create header row
+      const headerRow = document.createElement("tr");
+      Object.keys(data[0]).forEach(key => {
+        const th = document.createElement("th");
+        th.textContent = key;
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+
+      // Pagination
+      const start = (currentPage - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      const paginatedData = data.slice(start, end);
+
+      // Add rows
+      paginatedData.forEach(row => {
+        const tr = document.createElement("tr");
+        Object.entries(row).forEach(([key, value]) => {
+          const td = document.createElement("td");
+          if (key.toLowerCase().includes("link")) {
+            // Make links clickable
+            const a = document.createElement("a");
+            a.href = value;
+            a.textContent = value;
+            a.target = "_blank";
+            td.appendChild(a);
+          } else {
+            td.textContent = value;
+          }
+          tr.appendChild(td);
         });
+        tbody.appendChild(tr);
+      });
 
-        function search() {
-            let query = document.getElementById("searchBox").value;
-            fetch(`/search?q=${query}`)
-                .then(response => response.json())
-                .then(data => {
-                    allData = data;
-                    renderTable();
-                });
-        }
+      table.appendChild(thead);
+      table.appendChild(tbody);
+      tableContainer.appendChild(table);
+    }
 
-        function clearSearch() {
-            document.getElementById("searchBox").value = "";
-            currentPage = 1;
-            search();
-        }
+    function clearSearch() {
+      document.getElementById("searchBox").value = "";
+      fetchData();
+    }
 
-        function renderTable() {
-            let resultsDiv = document.getElementById("results");
-            resultsDiv.innerHTML = "";
-            
-            if (allData.length === 0) {
-                resultsDiv.innerHTML = "<p>No results found</p>";
-                document.getElementById("pageInfo").innerText = "";
-                return;
-            }
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        displayTable();
+      }
+    }
 
-            let start = (currentPage - 1) * rowsPerPage;
-            let end = start + rowsPerPage;
-            let paginatedData = allData.slice(start, end);
+    function nextPage() {
+      if (currentPage * rowsPerPage < data.length) {
+        currentPage++;
+        displayTable();
+      }
+    }
 
-            let table = "<table><tr>";
-            Object.keys(paginatedData[0]).forEach(key => {
-                table += `<th>${key}</th>`;
-            });
-            table += "</tr>";
+    document.getElementById("searchBox").addEventListener("input", (e) => {
+      fetchData(e.target.value);
+    });
 
-            paginatedData.forEach(row => {
-                table += "<tr>";
-                Object.values(row).forEach(val => {
-                    table += `<td>${val}</td>`;
-                });
-                table += "</tr>";
-            });
-
-            table += "</table>";
-            resultsDiv.innerHTML = table;
-
-            // Update pagination info
-            let totalPages = Math.ceil(allData.length / rowsPerPage);
-            document.getElementById("pageInfo").innerText = `Page ${currentPage} of ${totalPages}`;
-        }
-
-        function nextPage() {
-            let totalPages = Math.ceil(allData.length / rowsPerPage);
-            if (currentPage < totalPages) {
-                currentPage++;
-                renderTable();
-            }
-        }
-
-        function prevPage() {
-            if (currentPage > 1) {
-                currentPage--;
-                renderTable();
-            }
-        }
-
-        // Load full list on page load
-        window.onload = search;
-    </script>
+    // Load all data on startup
+    fetchData();
+  </script>
 </body>
 </html>
