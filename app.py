@@ -3,8 +3,11 @@ import pandas as pd
 
 app = Flask(__name__)
 
-# Load your CSV once when the app starts
-df = pd.read_csv("yourfile.csv")
+# Google Sheets live CSV URL
+CSV_URL = "https://docs.google.com/spreadsheets/d/1IcLsng5J0Iwl9bTTCyIWiLpVdyWpbCOmUxXmuaboBho/gviz/tq?tqx=out:csv"
+
+def load_data():
+    return pd.read_csv(CSV_URL)
 
 @app.route("/")
 def index():
@@ -13,11 +16,15 @@ def index():
 @app.route("/search")
 def search():
     query = request.args.get("q", "").lower()
+    df = load_data()  # always load the latest data
     if query:
         # Search all columns for the query
-        results = df[df.apply(lambda row: row.astype(str).str.lower().str.contains(query).any(), axis=1)]
+        results = df[df.apply(
+            lambda row: row.astype(str).str.lower().str.contains(query).any(),
+            axis=1
+        )]
         return results.to_json(orient="records")
-    return jsonify([])
+    return df.to_json(orient="records")  # show full list if no query
 
 if __name__ == "__main__":
     app.run(debug=True)
