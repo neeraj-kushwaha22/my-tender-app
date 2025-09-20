@@ -1,40 +1,46 @@
 {% extends "base.html" %}
 
-{% block title %}Tender Results - Xpress Tenders{% endblock %}
-
 {% block content %}
-<div class="container">
-  <h2 class="text-center">Tender Search Results</h2>
+<div class="container mt-5">
+    <h2 class="mb-4">Search Results for "{{ query }}"</h2>
 
-  {% if tenders %}
-    <div class="table-responsive mt-4">
-      <table class="table table-bordered table-striped">
-        <thead>
-          <tr>
-            <th>Tender ID</th>
-            <th>Title</th>
-            <th>Department</th>
-            <th>State</th>
-            <th>City</th>
-            <th>Due Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for tender in tenders %}
-            <tr>
-              <td>{{ tender.tender_id }}</td>
-              <td>{{ tender.title }}</td>
-              <td>{{ tender.department }}</td>
-              <td>{{ tender.state }}</td>
-              <td>{{ tender.city }}</td>
-              <td>{{ tender.due_date }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <p class="text-center mt-4">No tenders found for your search.</p>
-  {% endif %}
+    {% if results %}
+        <table class="table table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Bid Number</th>
+                    <th>RA Number</th>
+                    <th>Items</th>
+                    <th>Quantity</th>
+                    <th>Ministry</th>
+                    <th>Department</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in results %}
+                <tr>
+                    <td>{{ row["Bid Number"] }}</td>
+                    <td>{{ row["RA Number"] }}</td>
+                    <td>{{ row["Items"] }}</td>
+                    <td>{{ row["Quantity Required"] }}</td>
+                    <td>{{ row["Ministry"] }}</td>
+                    <td>{{ row["Department"] }}</td>
+                    <td>{{ row["Start Date"] }}</td>
+                    <td>{{ row["End Date"] }}</td>
+                    <td>
+                        <a href="{{ row["Bid Link"] }}" target="_blank" class="btn btn-sm btn-primary">
+                            View Bid
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-warning">No results found for "{{ query }}".</div>
+    {% endif %}
 </div>
 {% endblock %}

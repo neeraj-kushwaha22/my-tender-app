@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request
 import pandas as pd
 import time
 
@@ -10,7 +10,7 @@ CSV_URL = "https://docs.google.com/spreadsheets/d/1IcLsng5J0Iwl9bTTCyIWiLpVdyWpb
 # Cache setup
 df_cache = None
 last_fetched = 0
-CACHE_TIMEOUT = 300  # 5 minutes
+CACHE_TIMEOUT = 120  # 2 minutes
 
 
 def get_data():
@@ -31,25 +31,10 @@ def index():
 
 @app.route("/search")
 def search():
-    """Return JSON results (API)"""
+    """Search results (HTML table)"""
     query = request.args.get("q", "").lower()
     df = get_data()
-    if query:
-        # Filter rows matching query
-        results = df[df.apply(
-            lambda row: row.astype(str).str.lower().str.contains(query).any(),
-            axis=1
-        )]
-    else:
-        results = df
-    return results.to_json(orient="records")
 
-
-@app.route("/results")
-def results():
-    """Return results in an HTML table"""
-    query = request.args.get("q", "").lower()
-    df = get_data()
     if query:
         results = df[df.apply(
             lambda row: row.astype(str).str.lower().str.contains(query).any(),
@@ -57,8 +42,12 @@ def results():
         )]
     else:
         results = df
-    # Pass data as dictionary list
-    return render_template("results.html", tables=results.to_dict(orient="records"))
+
+    return render_template(
+        "results.html",
+        query=query,
+        results=results.to_dict(orient="records")
+    )
 
 
 if __name__ == "__main__":
