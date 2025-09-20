@@ -1,8 +1,11 @@
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import time
+from flask_cors import CORS   # ✅ NEW
 
 app = Flask(__name__)
+# Allow your frontend domain (replace with your live domain if needed)
+CORS(app, origins=["https://xpresstenders.com"])
 
 # Google Sheets CSV link
 CSV_URL = "https://docs.google.com/spreadsheets/d/1IcLsng5J0Iwl9bTTCyIWiLpVdyWpbCOmUxXmuaboBho/gviz/tq?tqx=out:csv"
@@ -37,7 +40,8 @@ def search():
     else:
         # No query → return full dataset
         results = df
-    return results.to_json(orient="records")
+    # ✅ Return JSON with proper headers
+    return jsonify(results.to_dict(orient="records"))
 
 if __name__ == "__main__":
     app.run(debug=True)
