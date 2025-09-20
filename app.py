@@ -1,8 +1,13 @@
+from datetime import datetime
+
 from flask import Flask, render_template, request
 import pandas as pd
 import time
 
 app = Flask(__name__)
+@app.context_processor
+def inject_current_year():
+    return {'current_year': datetime.now().year}
 
 # Google Sheets CSV link
 CSV_URL = "https://docs.google.com/spreadsheets/d/1IcLsng5J0Iwl9bTTCyIWiLpVdyWpbCOmUxXmuaboBho/gviz/tq?tqx=out:csv"
