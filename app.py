@@ -1,11 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import pandas as pd
 import time
-from flask_cors import CORS   # ✅ NEW
 
 app = Flask(__name__)
-# Allow your frontend domain (replace with your live domain if needed)
-CORS(app, origins=["https://xpresstenders.com"])
 
 # Google Sheets CSV link
 CSV_URL = "https://docs.google.com/spreadsheets/d/1IcLsng5J0Iwl9bTTCyIWiLpVdyWpbCOmUxXmuaboBho/gviz/tq?tqx=out:csv"
@@ -15,7 +12,9 @@ df_cache = None
 last_fetched = 0
 CACHE_TIMEOUT = 300  # 5 minutes
 
+
 def get_data():
+    """Fetch data from Google Sheets with caching"""
     global df_cache, last_fetched
     now = time.time()
     if df_cache is None or (now - last_fetched) > CACHE_TIMEOUT:
@@ -23,25 +22,44 @@ def get_data():
         last_fetched = now
     return df_cache
 
+
 @app.route("/")
 def index():
+    """Homepage"""
     return render_template("index.html")
+
 
 @app.route("/search")
 def search():
+    """Return JSON results (API)"""
     query = request.args.get("q", "").lower()
     df = get_data()
     if query:
-        # Search all columns for the query
+        # Filter rows matching query
         results = df[df.apply(
             lambda row: row.astype(str).str.lower().str.contains(query).any(),
             axis=1
         )]
     else:
-        # No query → return full dataset
         results = df
-    # ✅ Return JSON with proper headers
-    return jsonify(results.to_dict(orient="records"))
+    return results.to_json(orient="records")
+
+
+@app.route("/results")
+def results():
+    """Return results in an HTML table"""
+    query = request.args.get("q", "").lower()
+    df = get_data()
+    if query:
+        results = df[df.apply(
+            lambda row: row.astype(str).str.lower().str.contains(query).any(),
+            axis=1
+        )]
+    else:
+        results = df
+    # Pass data as dictionary list
+    return render_template("results.html", tables=results.to_dict(orient="records"))
+
 
 if __name__ == "__main__":
     app.run(debug=True)
