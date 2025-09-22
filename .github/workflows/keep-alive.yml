@@ -1,0 +1,13 @@
+name: Keep Render App Alive
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # runs every 5 minutes
+  workflow_dispatch:        # lets you run it manually from GitHub Actions tab
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl request to Render app
+        run: curl -s https://my-tender-app.onrender.com > /dev/null
