@@ -1,10 +1,12 @@
 from datetime import datetime
-
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify   # 👈 added jsonify
 import pandas as pd
 import time
+import os
+from sqlalchemy import create_engine, text   # 👈 added sqlalchemy
 
 app = Flask(__name__)
+
 @app.context_processor
 def inject_current_year():
     return {'current_year': datetime.now().year}
@@ -17,6 +19,21 @@ df_cache = None
 last_fetched = 0
 CACHE_TIMEOUT = 120  # 2 minutes
 
+# -----------------------------
+# ✅ DATABASE CONNECTION SETUP
+# -----------------------------
+DATABASE_URL = os.getenv("DATABASE_URL")
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+
+@app.route("/db-health")
+def db_health():
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT NOW();"))
+            return jsonify(ok=True, db_time=str(result.scalar()))
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+# -----------------------------
 
 def get_data():
     """Fetch data from Google Sheets with caching"""
