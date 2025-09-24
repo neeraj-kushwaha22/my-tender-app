@@ -55,14 +55,9 @@ def db_health():
 @app.route("/login", methods=["POST"])
 def login():
     """Login and return subscription info"""
-    # Support both JSON and form-encoded
-    if request.is_json:
-        data = request.get_json()
-        email = data.get("email")
-        password = data.get("password")
-    else:
-        email = request.form.get("email")
-        password = request.form.get("password")
+    data = request.get_json()  # <-- FIX: read JSON instead of form
+    email = data.get("email")
+    password = data.get("password")
 
     db = SessionLocal()
     user = db.query(User).filter_by(email=email).first()
