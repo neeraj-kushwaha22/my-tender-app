@@ -1,42 +1,33 @@
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify   # 👈 added jsonify
+from flask import Flask, render_template, request, jsonify, session
+from flask_cors import CORS
 import pandas as pd
 import time
 import os
-from sqlalchemy import create_engine, text   # 👈 added sqlalchemy
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from werkzeug.security import check_password_hash
+from init_db import User, Subscription, SubscriptionStatus, SessionLocal  # from init_db.py
 
 app = Flask(__name__)
 
-@app.context_processor
-def inject_current_year():
-    return {'current_year': datetime.now().year}
+# Secret key for sessions (important for login sessions)
+app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 
-# Google Sheets CSV link
+# Allow frontend domain to talk to backend
+CORS(app, supports_credentials=True, origins=["https://xpresstenders.com"])
+
+# -----------------------------
+# Google Sheets CSV setup
+# -----------------------------
 CSV_URL = "https://docs.google.com/spreadsheets/d/1IcLsng5J0Iwl9bTTCyIWiLpVdyWpbCOmUxXmuaboBho/gviz/tq?tqx=out:csv"
-
-# Cache setup
 df_cache = None
 last_fetched = 0
 CACHE_TIMEOUT = 120  # 2 minutes
 
-# -----------------------------
-# ✅ DATABASE CONNECTION SETUP
-# -----------------------------
-DATABASE_URL = os.getenv("DATABASE_URL")
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-
-@app.route("/db-health")
-def db_health():
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text("SELECT NOW();"))
-            return jsonify(ok=True, db_time=str(result.scalar()))
-    except Exception as e:
-        return jsonify(ok=False, error=str(e)), 500
-# -----------------------------
 
 def get_data():
-    """Fetch data from Google Sheets with caching"""
+    """Fetch tender data from Google Sheets with caching"""
     global df_cache, last_fetched
     now = time.time()
     if df_cache is None or (now - last_fetched) > CACHE_TIMEOUT:
@@ -44,16 +35,74 @@ def get_data():
         last_fetched = now
     return df_cache
 
+# -----------------------------
+# Routes
+# -----------------------------
 
-@app.route("/")
-def index():
-    """Homepage"""
-    return render_template("index.html")
+@app.route("/db-health")
+def db_health():
+    """Check DB connection"""
+    try:
+        db = SessionLocal()
+        result = db.execute(text("SELECT NOW();"))
+        db.close()
+        return jsonify(ok=True, db_time=str(result.scalar()))
+    except Exception as e:
+        return jsonify(ok=False, error=str(e)), 500
+
+
+@app.route("/login", methods=["POST"])
+def login():
+    """Login and return subscription info"""
+    # Support both JSON and form-encoded
+    if request.is_json:
+        data = request.get_json()
+        email = data.get("email")
+        password = data.get("password")
+    else:
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+    db = SessionLocal()
+    user = db.query(User).filter_by(email=email).first()
+
+    if user and check_password_hash(user.password_hash, password):
+        session["user_id"] = user.id
+
+        # Check subscription
+        sub = db.query(Subscription).filter_by(
+            user_id=user.id,
+            status=SubscriptionStatus.active
+        ).first()
+        db.close()
+
+        subscription_status = "premium" if sub else "free"
+        return jsonify({"success": True, "subscription": subscription_status})
+    else:
+        db.close()
+        return jsonify({"success": False, "message": "Invalid credentials"}), 401
+
+
+@app.route("/logout")
+def logout():
+    """Clear session"""
+    session.pop("user_id", None)
+    return jsonify({"success": True, "message": "Logged out"})
 
 
 @app.route("/search")
 def search():
-    """Search results (HTML table)"""
+    """Search tenders, restrict details if not premium"""
+    if "user_id" not in session:
+        return jsonify({"success": False, "message": "Login required"}), 403
+
+    db = SessionLocal()
+    user_id = session["user_id"]
+    subscription = db.query(Subscription).filter_by(
+        user_id=user_id, status=SubscriptionStatus.active
+    ).first()
+    db.close()
+
     query = request.args.get("q", "").lower()
     df = get_data()
 
@@ -65,11 +114,20 @@ def search():
     else:
         results = df
 
-    return render_template(
-        "results.html",
-        query=query,
-        results=results.to_dict(orient="records")
-    )
+    results = results.to_dict(orient="records")
+
+    # If not premium, restrict details
+    if not subscription:
+        locked_results = []
+        for r in results:
+            locked_results.append({
+                "Items": r.get("Items", "N/A"),
+                "Quantity Required": r.get("Quantity Required", "N/A"),
+                "Note": "🔒 Upgrade to premium to see full tender details"
+            })
+        results = locked_results
+
+    return jsonify({"success": True, "results": results})
 
 
 if __name__ == "__main__":
