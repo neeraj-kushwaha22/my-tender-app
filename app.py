@@ -7,7 +7,8 @@ import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from werkzeug.security import check_password_hash
-from .init_db import User, Subscription, SubscriptionStatus, SessionLocal  # from init_db.py
+import init_db
+from init_db import User, Subscription, SubscriptionStatus, SessionLocal
 
 app = Flask(__name__)
 
