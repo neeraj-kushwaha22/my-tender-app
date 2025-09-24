@@ -54,8 +54,7 @@ def db_health():
 
 @app.route("/login", methods=["POST"])
 def login():
-    """Login and return subscription info"""
-    data = request.get_json()  # <-- FIX: read JSON instead of form
+    data = request.get_json()   # 👈 read JSON body
     email = data.get("email")
     password = data.get("password")
 
@@ -73,7 +72,11 @@ def login():
         db.close()
 
         subscription_status = "premium" if sub else "free"
-        return jsonify({"success": True, "subscription": subscription_status})
+
+        return jsonify({
+            "success": True,
+            "subscription": subscription_status
+        })
     else:
         db.close()
         return jsonify({"success": False, "message": "Invalid credentials"}), 401
