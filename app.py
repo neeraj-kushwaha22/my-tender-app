@@ -4,6 +4,7 @@ from flask_cors import CORS
 import pandas as pd
 import time
 import os
+from sqlalchemy import func
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from werkzeug.security import check_password_hash
@@ -54,32 +55,31 @@ def db_health():
 
 @app.route("/login", methods=["POST"])
 def login():
-    data = request.get_json()   # 👈 read JSON body
-    email = data.get("email")
-    password = data.get("password")
+   data = (request.get_json(silent=True) or {})
+email = (data.get("email") or "").strip().lower()
+password = (data.get("password") or "")
 
-    db = SessionLocal()
-    user = db.query(User).filter_by(email=email).first()
+db = SessionLocal()
+user = db.query(User).filter(func.lower(User.email) == email).first()
 
-    if user and check_password_hash(user.password_hash, password):
-        session["user_id"] = user.id
+if not user:
+    db.close()
+    return jsonify({"success": False, "message": "User not found"}), 401
 
-        # Check subscription
-        sub = db.query(Subscription).filter_by(
-            user_id=user.id,
-            status=SubscriptionStatus.active
-        ).first()
-        db.close()
+if not check_password_hash(user.password_hash, password):
+    db.close()
+    return jsonify({"success": False, "message": "Wrong password"}), 401
 
-        subscription_status = "premium" if sub else "free"
+# success
+session["user_id"] = user.id
 
-        return jsonify({
-            "success": True,
-            "subscription": subscription_status
-        })
-    else:
-        db.close()
-        return jsonify({"success": False, "message": "Invalid credentials"}), 401
+sub = db.query(Subscription).filter_by(
+    user_id=user.id, status=SubscriptionStatus.active
+).first()
+db.close()
+
+subscription_status = "premium" if sub else "free"
+return jsonify({"success": True, "subscription": subscription_status})
 
 
 @app.route("/logout")
