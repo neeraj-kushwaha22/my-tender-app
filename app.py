@@ -79,7 +79,7 @@ sub = db.query(Subscription).filter_by(
 db.close()
 
 subscription_status = "premium" if sub else "free"
-return jsonify({"success": True, "subscription": subscription_status})
+    return jsonify({"success": True, "subscription": subscription_status})
 
 
 @app.route("/logout")
@@ -91,16 +91,18 @@ def logout():
 
 @app.route("/search")
 def search():
-    """Search tenders, restrict details if not premium"""
-    if "user_id" not in session:
-        return jsonify({"success": False, "message": "Login required"}), 403
+    """Search tenders: always show results, but lock details if not premium"""
 
-    db = SessionLocal()
-    user_id = session["user_id"]
-    subscription = db.query(Subscription).filter_by(
-        user_id=user_id, status=SubscriptionStatus.active
-    ).first()
-    db.close()
+    user_id = session.get("user_id")
+    subscription = None
+
+    if user_id:
+        db = SessionLocal()
+        subscription = db.query(Subscription).filter_by(
+            user_id=user_id, status=SubscriptionStatus.active
+        ).first()
+        db.close()
+
 
     query = request.args.get("q", "").lower()
     df = get_data()
