@@ -55,30 +55,30 @@ def db_health():
 
 @app.route("/login", methods=["POST"])
 def login():
-   data = (request.get_json(silent=True) or {})
-email = (data.get("email") or "").strip().lower()
-password = (data.get("password") or "")
+    data = (request.get_json(silent=True) or {})
+    email = (data.get("email") or "").strip().lower()
+    password = (data.get("password") or "")
 
-db = SessionLocal()
-user = db.query(User).filter(func.lower(User.email) == email).first()
+    db = SessionLocal()
+    user = db.query(User).filter(func.lower(User.email) == email).first()
 
-if not user:
+    if not user:
+        db.close()
+        return jsonify({"success": False, "message": "User not found"}), 401
+
+    if not check_password_hash(user.password_hash, password):
+        db.close()
+        return jsonify({"success": False, "message": "Wrong password"}), 401
+
+    # success
+    session["user_id"] = user.id
+
+    sub = db.query(Subscription).filter_by(
+        user_id=user.id, status=SubscriptionStatus.active
+    ).first()
     db.close()
-    return jsonify({"success": False, "message": "User not found"}), 401
 
-if not check_password_hash(user.password_hash, password):
-    db.close()
-    return jsonify({"success": False, "message": "Wrong password"}), 401
-
-# success
-session["user_id"] = user.id
-
-sub = db.query(Subscription).filter_by(
-    user_id=user.id, status=SubscriptionStatus.active
-).first()
-db.close()
-
-subscription_status = "premium" if sub else "free"
+    subscription_status = "premium" if sub else "free"
     return jsonify({"success": True, "subscription": subscription_status})
 
 
@@ -102,7 +102,6 @@ def search():
             user_id=user_id, status=SubscriptionStatus.active
         ).first()
         db.close()
-
 
     query = request.args.get("q", "").lower()
     df = get_data()
