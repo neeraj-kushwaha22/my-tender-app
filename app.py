@@ -116,6 +116,17 @@ def logout():
     return jsonify({"success": True, "message": "Logged out"})
 
 
+@app.route("/filters")
+def filters():
+    df = get_data()
+    filters = {
+        "departments": sorted(df["Department"].dropna().unique().tolist()),
+        "categories": sorted(df["Category"].dropna().unique().tolist()),
+        "states": sorted(df["State"].dropna().unique().tolist()),
+    }
+    return jsonify(filters)
+
+
 @app.route("/search")
 def search():
     """Search tenders: always show results, but lock details if not premium"""
