@@ -4,9 +4,7 @@ from flask_cors import CORS
 import pandas as pd
 import time
 import os
-from sqlalchemy import func
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func, text
 from werkzeug.security import check_password_hash
 import init_db
 from init_db import User, Subscription, SubscriptionStatus, SessionLocal
@@ -17,6 +15,9 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 
 # Allow frontend domain to talk to backend
+app.config.update(
+    SESSION_COOKIE_SAMESITE="None",   # allow cookie to be sent cross-site
+    SESSION_COOKIE_SECURE=True        # required when SameSite=None (works only on HTTPS)
 CORS(app, supports_credentials=True, origins=["https://xpresstenders.com"])
 
 # -----------------------------
@@ -37,10 +38,31 @@ def get_data():
         last_fetched = now
     return df_cache
 
+
+# -----------------------------
+# Helper functions
+# -----------------------------
+def _lc(v):
+    return str(v or "").strip().lower()
+
+def _to_int(v):
+    """Convert tender value safely (remove commas, handle blanks)"""
+    try:
+        return int(str(v or "0").replace(",", "").strip())
+    except Exception:
+        return 0
+
+def parse_date(dstr):
+    """Convert DD-MM-YYYY string from CSV into a date object"""
+    try:
+        return datetime.strptime(str(dstr).strip(), "%d-%m-%Y").date()
+    except Exception:
+        return None
+
+
 # -----------------------------
 # Routes
 # -----------------------------
-
 @app.route("/ping")
 def ping():
     return jsonify(ok=True, time=datetime.utcnow().isoformat())
@@ -131,21 +153,29 @@ def search():
     status = request.args.get("status")
 
     if department:
-        results = [r for r in results if r.get("Department") == department]
+        results = [r for r in results if _lc(r.get("Department")) == _lc(department)]
     if category:
-        results = [r for r in results if r.get("Category") == category]
+        results = [r for r in results if _lc(r.get("Category")) == _lc(category)]
     if state:
-        results = [r for r in results if r.get("State") == state]
-    if min_value:
-        results = [r for r in results if int(r.get("Tender Value", 0)) >= min_value]
-    if max_value:
-        results = [r for r in results if int(r.get("Tender Value", 0)) <= max_value]
+        results = [r for r in results if _lc(r.get("State")) == _lc(state)]
+    if min_value is not None:
+        results = [r for r in results if _to_int(r.get("Tender Value")) >= min_value]
+    if max_value is not None:
+        results = [r for r in results if _to_int(r.get("Tender Value")) <= max_value]
     if date:
-        results = [r for r in results if r.get("Published Date") >= date]
+        try:
+            filter_date = datetime.strptime(date, "%Y-%m-%d").date()  # frontend ISO
+            results = [r for r in results if parse_date(r.get("Published Date")) and parse_date(r.get("Published Date")) >= filter_date]
+        except Exception:
+            pass
     if closing:
-        results = [r for r in results if r.get("Closing Date") <= closing]
+        try:
+            filter_closing = datetime.strptime(closing, "%Y-%m-%d").date()
+            results = [r for r in results if parse_date(r.get("Closing Date")) and parse_date(r.get("Closing Date")) <= filter_closing]
+        except Exception:
+            pass
     if status:
-        results = [r for r in results if r.get("Status") == status]
+        results = [r for r in results if _lc(r.get("Status")) == _lc(status)]
 
     # 🔹 Premium restriction
     if not subscription:
