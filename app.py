@@ -41,6 +41,10 @@ def get_data():
 # Routes
 # -----------------------------
 
+@app.route("/ping")
+def ping():
+    return jsonify(ok=True, time=datetime.utcnow().isoformat())
+
 @app.route("/db-health")
 def db_health():
     """Check DB connection"""

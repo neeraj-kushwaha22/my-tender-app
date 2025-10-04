@@ -10,4 +10,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Curl request to Render app
-        run: curl -s https://my-tender-app.onrender.com > /dev/null
+        run: curl -s https://xpresstenders.com/ping > /dev/null
