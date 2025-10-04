@@ -119,35 +119,35 @@ def search():
         results = df
 
     results = results.to_dict(orient="records")
-department = request.args.get("department")
-category = request.args.get("category")
-state = request.args.get("state")
-min_value = request.args.get("minValue", type=int)
-max_value = request.args.get("maxValue", type=int)
-date = request.args.get("date")
-closing = request.args.get("closing")
-status = request.args.get("status")
 
-# apply filters one by one
-if department:
-    results = [r for r in results if r.get("Department") == department]
-if category:
-    results = [r for r in results if r.get("Category") == category]
-if state:
-    results = [r for r in results if r.get("State") == state]
-if min_value:
-    results = [r for r in results if int(r.get("Tender Value", 0)) >= min_value]
-if max_value:
-    results = [r for r in results if int(r.get("Tender Value", 0)) <= max_value]
-if date:
-    results = [r for r in results if r.get("Published Date") >= date]
-if closing:
-    results = [r for r in results if r.get("Closing Date") <= closing]
-if status:
-    results = [r for r in results if r.get("Status") == status]
+    # 🔹 Apply filters
+    department = request.args.get("department")
+    category = request.args.get("category")
+    state = request.args.get("state")
+    min_value = request.args.get("minValue", type=int)
+    max_value = request.args.get("maxValue", type=int)
+    date = request.args.get("date")
+    closing = request.args.get("closing")
+    status = request.args.get("status")
 
+    if department:
+        results = [r for r in results if r.get("Department") == department]
+    if category:
+        results = [r for r in results if r.get("Category") == category]
+    if state:
+        results = [r for r in results if r.get("State") == state]
+    if min_value:
+        results = [r for r in results if int(r.get("Tender Value", 0)) >= min_value]
+    if max_value:
+        results = [r for r in results if int(r.get("Tender Value", 0)) <= max_value]
+    if date:
+        results = [r for r in results if r.get("Published Date") >= date]
+    if closing:
+        results = [r for r in results if r.get("Closing Date") <= closing]
+    if status:
+        results = [r for r in results if r.get("Status") == status]
 
-    # If not premium, restrict details
+    # 🔹 Premium restriction
     if not subscription:
         locked_results = []
         for r in results:
