@@ -18,6 +18,7 @@ app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 app.config.update(
     SESSION_COOKIE_SAMESITE="None",   # allow cookie to be sent cross-site
     SESSION_COOKIE_SECURE=True        # required when SameSite=None (works only on HTTPS)
+)
 CORS(app, supports_credentials=True, origins=["https://xpresstenders.com"])
 
 # -----------------------------
