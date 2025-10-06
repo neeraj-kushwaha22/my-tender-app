@@ -241,34 +241,37 @@ def search():
         results = [r for r in results if _to_int(r.get("Tender Value")) <= max_value]
 
     # --- Date range filtering ---
-def normalize_date(value):
-    """Handle both DD-MM-YYYY and YYYY-MM-DD formats safely"""
-    if not value:
-        return None
-    for fmt in ("%d-%m-%Y", "%Y-%m-%d"):
+    # --- Date range filtering ---
+    def normalize_date(value):
+        """Handle both DD-MM-YYYY and YYYY-MM-DD formats safely"""
+        if not value:
+            return None
+        for fmt in ("%d-%m-%Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(value.strip(), fmt).date()
+            except Exception:
+                continue
+        return None  # ✅ must be inside the function
+
+    if start_date:
         try:
-            return datetime.strptime(value.strip(), fmt).date()
+            f_date = normalize_date(start_date)
+            results = [
+                r for r in results
+                if normalize_date(r.get("Start Date")) and normalize_date(r.get("Start Date")) >= f_date
+            ]
         except Exception:
-            continue
-    return None
+            pass
 
-if start_date:
-    try:
-        f_date = normalize_date(start_date)
-        results = [r for r in results if (
-            normalize_date(r.get("Start Date")) and normalize_date(r.get("Start Date")) >= f_date
-        )]
-    except Exception:
-        pass
-
-if end_date:
-    try:
-        f_end = normalize_date(end_date)
-        results = [r for r in results if (
-            normalize_date(r.get("End Date")) and normalize_date(r.get("End Date")) <= f_end
-        )]
-    except Exception:
-        pass
+    if end_date:
+        try:
+            f_end = normalize_date(end_date)
+            results = [
+                r for r in results
+                if normalize_date(r.get("End Date")) and normalize_date(r.get("End Date")) <= f_end
+            ]
+        except Exception:
+            pass
 
     # 🔹 Premium restriction
     if not subscription:
