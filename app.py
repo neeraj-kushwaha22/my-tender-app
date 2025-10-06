@@ -31,14 +31,24 @@ CACHE_TIMEOUT = 120  # 2 minutes
 
 
 def get_data():
-    """Fetch tender data from Google Sheets with caching"""
+    """Fetch tender data from Google Sheets with caching and safe fallbacks"""
     global df_cache, last_fetched
     now = time.time()
     if df_cache is None or (now - last_fetched) > CACHE_TIMEOUT:
-        df_cache = pd.read_csv(CSV_URL)
-        last_fetched = now
+        try:
+            df = pd.read_csv(CSV_URL, dtype=str)  # keep everything as strings
+            df = normalize_headers(df)
+            df_cache = df
+            last_fetched = now
+        except Exception as e:
+            app.logger.exception("Failed to read CSV from Google Sheets")
+            # safe empty dataframe with expected headers so the app still runs
+            df_cache = pd.DataFrame(columns=[
+                "Items","Quantity Required","State","Department","Category",
+                "Tender Value","Published Date","Closing Date","Status"
+            ])
+            last_fetched = now
     return df_cache
-
 
 # -----------------------------
 # Helper functions
@@ -60,6 +70,38 @@ def parse_date(dstr):
     except Exception:
         return None
 
+def normalize_headers(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]  # strip weird spaces
+    return df
+
+def pick_col(df: pd.DataFrame, candidates) -> str | None:
+    """
+    Find the first matching column by exact (case-insensitive) name,
+    then by substring containment as a fallback.
+    """
+    if df is None or df.empty:
+        return None
+    lookup = {c.strip().lower(): c for c in df.columns}
+    # exact match first
+    for name in candidates:
+        key = str(name).strip().lower()
+        if key in lookup:
+            return lookup[key]
+    # then 'contains' match
+    for c_lower, orig in lookup.items():
+        for name in candidates:
+            if str(name).strip().lower() in c_lower:
+                return orig
+    return None
+
+def unique_list(df: pd.DataFrame, col: str) -> list[str]:
+    if not col or col not in df.columns:
+        return []
+    vals = (df[col].dropna().astype(str)
+            .map(lambda x: x.strip())
+            .replace({"-": ""}))
+    return sorted([v for v in vals.unique().tolist() if v])
 
 # -----------------------------
 # Routes
@@ -118,13 +160,25 @@ def logout():
 
 @app.route("/filters")
 def filters():
-    df = get_data()
-    filters = {
-        "departments": sorted(df["Department"].dropna().unique().tolist()),
-        "categories": sorted(df["Category"].dropna().unique().tolist()),
-        "states": sorted(df["State"].dropna().unique().tolist()),
-    }
-    return jsonify(filters)
+    try:
+        df = get_data()
+
+        # try multiple header variants that commonly appear
+        dept_col = pick_col(df, ["Department", "Department Name", "Buyer Name",
+                                 "Organisation", "Organisation Chain"])
+        cat_col  = pick_col(df, ["Category", "Item Category", "Bid Type"])
+        state_col= pick_col(df, ["State", "State/UT", "State Name", "Location"])
+
+        data = {
+            "departments": unique_list(df, dept_col),
+            "categories":  unique_list(df, cat_col),
+            "states":      unique_list(df, state_col),
+        }
+        return jsonify(data)
+    except Exception as e:
+        app.logger.exception("/filters failed")
+        # never 500 to the browser; return empty arrays instead
+        return jsonify({"departments": [], "categories": [], "states": []})
 
 
 @app.route("/search")
