@@ -162,23 +162,25 @@ def logout():
 def filters():
     try:
         df = get_data()
+        df.columns = [c.strip() for c in df.columns]
 
-        # try multiple header variants that commonly appear
-        dept_col = pick_col(df, ["Department", "Department Name", "Buyer Name",
-                                 "Organisation", "Organisation Chain"])
-        cat_col  = pick_col(df, ["Category", "Item Category", "Bid Type"])
-        state_col= pick_col(df, ["State", "State/UT", "State Name", "Location"])
+        def get_unique(col):
+            return sorted(df[col].dropna().unique().tolist()) if col in df.columns else []
 
-        data = {
-            "departments": unique_list(df, dept_col),
-            "categories":  unique_list(df, cat_col),
-            "states":      unique_list(df, state_col),
+        filters = {
+            "ministries": get_unique("Ministry"),
+            "departments": get_unique("Department"),
+            "categories": get_unique("Category"),
+            "states": get_unique("State"),
+            "statuses": get_unique("Status")
         }
-        return jsonify(data)
+        return jsonify(filters)
     except Exception as e:
         app.logger.exception("/filters failed")
-        # never 500 to the browser; return empty arrays instead
-        return jsonify({"departments": [], "categories": [], "states": []})
+        return jsonify({
+            "ministries": [], "departments": [], "categories": [],
+            "states": [], "statuses": []
+        })
 
 
 @app.route("/search")
@@ -209,39 +211,48 @@ def search():
     results = results.to_dict(orient="records")
 
     # 🔹 Apply filters
-    department = request.args.get("department")
-    category = request.args.get("category")
-    state = request.args.get("state")
+    ministry = request.args.get("ministry", "").lower()
+    department = request.args.get("department", "").lower()
+    category = request.args.get("category", "").lower()
+    state = request.args.get("state", "").lower()
+    status = request.args.get("status", "").lower()
     min_value = request.args.get("minValue", type=int)
     max_value = request.args.get("maxValue", type=int)
-    date = request.args.get("date")
-    closing = request.args.get("closing")
-    status = request.args.get("status")
+    start_date = request.args.get("date")
+    end_date = request.args.get("closing")
 
+    def match(val, key):
+        return key in str(val or "").lower()
+
+    if ministry:
+        results = [r for r in results if match(r.get("Ministry"), ministry)]
     if department:
-        results = [r for r in results if _lc(r.get("Department")) == _lc(department)]
+        results = [r for r in results if match(r.get("Department"), department)]
     if category:
-        results = [r for r in results if _lc(r.get("Category")) == _lc(category)]
+        results = [r for r in results if match(r.get("Category"), category)]
     if state:
-        results = [r for r in results if _lc(r.get("State")) == _lc(state)]
+        results = [r for r in results if match(r.get("State"), state)]
+    if status:
+        results = [r for r in results if match(r.get("Status"), status)]
+
     if min_value is not None:
         results = [r for r in results if _to_int(r.get("Tender Value")) >= min_value]
     if max_value is not None:
         results = [r for r in results if _to_int(r.get("Tender Value")) <= max_value]
-    if date:
+
+    if start_date:
         try:
-            filter_date = datetime.strptime(date, "%Y-%m-%d").date()  # frontend ISO
-            results = [r for r in results if parse_date(r.get("Published Date")) and parse_date(r.get("Published Date")) >= filter_date]
-        except Exception:
+            f_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            results = [r for r in results if parse_date(r.get("Start Date")) and parse_date(r.get("Start Date")) >= f_date]
+        except:
             pass
-    if closing:
+
+    if end_date:
         try:
-            filter_closing = datetime.strptime(closing, "%Y-%m-%d").date()
-            results = [r for r in results if parse_date(r.get("Closing Date")) and parse_date(r.get("Closing Date")) <= filter_closing]
-        except Exception:
+            f_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+            results = [r for r in results if parse_date(r.get("End Date")) and parse_date(r.get("End Date")) <= f_end]
+        except:
             pass
-    if status:
-        results = [r for r in results if _lc(r.get("Status")) == _lc(status)]
 
     # 🔹 Premium restriction
     if not subscription:
